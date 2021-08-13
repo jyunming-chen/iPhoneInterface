@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+<div id="info">THREE.JS 2D Template
+</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+
+
+<script>
+
+var camera, scene, renderer;
+
+init();
+animate();
+
+function init() {
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-50, 50, 50, -50, -10, 100);
+  camera.position.z = 10;
+
+  let grid = new THREE.GridHelper(100, 10, 'white', 'white');
+  scene.add(grid);
+  grid.rotation.x = Math.PI / 2;
+  scene.add(new THREE.AxesHelper(30));
+  /////////////////////////////////////////////////////////
+  window.addEventListener('resize', onWindowResize, false);
+
+  let loader = new THREE.TextureLoader();
+  dialmap = loader.load('https://i.imgur.com/vRnXfNB.png');
+  let dial;
+  scene.add(dial = new THREE.Mesh(new THREE.CircleGeometry(20, 30), new THREE.MeshBasicMaterial({map:dialmap})));
+  dial.position.x = -25;
+  let button;
+  scene.add(button = new THREE.Mesh(new THREE.PlaneGeometry(40, 20), new THREE.MeshBasicMaterial({
+    color: 'cyan'
+  })));
+  button.position.x = 20;
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+
+function animate() {
+  requestAnimationFrame(animate);
+  render();
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+</script>
+</body>
+
+</html>

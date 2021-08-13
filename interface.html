@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+<style>
+#info {
+  position: absolute;
+  top: 0px;
+  width: 100%;
+  padding: 10px;
+  text-align: center;
+  color: #ffff00
+}
+
+body {
+  overflow: hidden;
+}
+
+
+</style>
+</head>
+
+<body> 
+<div id="info">
+<p id=msg></p>
+</div>
+<script src="https://threejs.org/build/three.min.js"></script>
+<script src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+
+<script>
+var camera, scene, renderer;
+var dialAngle = 0;
+var dial, gas, tachometer;
+var currentPt = null;
+var gasLevel = 0.1;
+
+init();
+animate();
+
+function init() {
+
+  renderer = new THREE.WebGLRenderer({
+    antialias: true
+  });
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x888888);
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.OrthographicCamera(-30, 30, 17.5, -17.5, -10, 100);
+  camera.position.z = 10;
+
+  let grid = new THREE.GridHelper(100, 20, 'white', 'white');
+  scene.add(grid);
+  grid.rotation.x = Math.PI / 2;
+  scene.add(new THREE.AxesHelper(10));
+  
+  /////////////////////////////////////////////////////////
+  window.addEventListener('resize', onWindowResize, false);
+  
+  window.addEventListener('pointerdown', onMouseDown, false);
+  window.addEventListener('pointermove', onMouseMove, false);
+  window.addEventListener('pointerup', onMouseUp, false);
+
+	window.addEventListener('touchstart', onTouchStart, false);
+  window.addEventListener('touchmove', onTouchMove, false);
+  window.addEventListener('touchend', onTouchEnd, false);
+
+  let loader = new THREE.TextureLoader();
+  let dialmap = loader.load('https://i.imgur.com/pGBWmvB.png?1');
+
+  scene.add(dial = new THREE.Mesh(new THREE.CircleGeometry(10, 30), new THREE.MeshBasicMaterial({
+    map: dialmap
+  })));
+  dial.position.x = -15;
+  
+  scene.add(gas = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({
+    color: 'cyan'
+  })));
+  scene.add (tachometer = makeTachometer());
+  gas.position.x = 15;
+  tachometer.position.set (15, -10,0);
+  
+  updateTachometer (0.1);
+}	
+
+//
+// onTouchStart (e)
+// onTouchMove (e)
+// onTouchEnd (e)
+function onTouchStart(event) {
+
+  event.preventDefault();
+  if (event.touches.length === 1) {
+  let mouseX = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
+  let mouseY = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
+
+  // transform to world coordinate ...
+  mouseX = mouseX / 2 * 60;
+  mouseY = mouseY / 2 * 35;
+  let r = 10;
+
+  // if fall in mouse area, register currentXY
+  if (Math.abs(mouseX - (-15)) < r && Math.abs(mouseY - 0) < r) {
+  
+    $('#msg').text('hit mouse');
+    currentPt = [mouseX, mouseY];
+    currentAngle = Math.atan2(mouseY, mouseX - (-15));
+
+	} else if (Math.abs(mouseX-15)<5 && Math.abs(mouseY)<5) {  // fall into gas area
+
+		$('#msg').text('hit gas');
+		setTimeout (stepOnGas, 0);
+    stillGassing = true;
+
+		currentPt = null;
+  } else {
+    
+    $('#msg').text('no hit');
+    currentPt = null;  
+  
+  }
+  }
+}
+
+
+function onMouseDown(event) {
+
+  event.preventDefault();
+  let mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+  let mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // transform to world coordinate ...
+  mouseX = mouseX / 2 * 60;
+  mouseY = mouseY / 2 * 35;
+  let r = 10;
+
+  // if fall in mouse area, register currentXY
+  if (Math.abs(mouseX - (-15)) < r && Math.abs(mouseY - 0) < r) {
+  
+    $('#msg').text('hit mouse');
+    currentPt = [mouseX, mouseY];
+    currentAngle = Math.atan2(mouseY, mouseX - (-15));
+
+	} else if (Math.abs(mouseX-15)<5 && Math.abs(mouseY)<5) {  // fall into gas area
+
+		$('#msg').text('hit gas');
+		setTimeout (stepOnGas, 0);
+    stillGassing = true;
+
+		currentPt = null;
+  } else {
+    
+    $('#msg').text('no hit');
+    currentPt = null;  
+  
+  }
+  
+}
+
+function onTouchMove(event) {
+  // if first hit not on dial, do nothing
+  if (currentPt === null)
+    return;
+
+  event.preventDefault();
+  if (event.touches.length === 1) {
+  let mouseX = (event.touches[0].pageX / window.innerWidth) * 2 - 1;
+  let mouseY = -(event.touches[0].pageY / window.innerHeight) * 2 + 1;
+
+  // transform to world coordinate ...
+  mouseX = mouseX / 2 * 60;
+  mouseY = mouseY / 2 * 35;
+  let r = 10;
+
+  // register now point [mouseX, mouseY];
+  // compute turning angle
+  let movePt = [mouseX, mouseY];
+  moveAngle = Math.atan2(mouseY, mouseX - (-15));
+
+	// clamping: CW/CCW 1.5 rounds
+  
+  // update dialAngle, currentAngle, currentPt;
+  dialAngle += moveAngle - currentAngle;
+  let msg = `${(moveAngle-Math.PI/2).toFixed(2)}`;
+  $('#msg').text(msg);
+  
+  currentAngle = moveAngle;
+  currentPt = movePt;
+  }
+  
+}
+
+function onMouseMove(event) {
+  // if first hit not on dial, do nothing
+  if (currentPt === null)
+    return;
+
+  event.preventDefault();
+  let mouseX = (event.clientX / window.innerWidth) * 2 - 1;
+  let mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // transform to world coordinate ...
+  mouseX = mouseX / 2 * 60;
+  mouseY = mouseY / 2 * 35;
+  let r = 10;
+
+  // register now point [mouseX, mouseY];
+  // compute turning angle
+  let movePt = [mouseX, mouseY];
+  moveAngle = Math.atan2(mouseY, mouseX - (-15));
+
+	// clamping: CW/CCW 1.5 rounds
+  
+  // update dialAngle, currentAngle, currentPt;
+  dialAngle += moveAngle - currentAngle;
+  let msg = `${(moveAngle-Math.PI/2).toFixed(2)}`;
+  $('#msg').text(msg);
+  
+  currentAngle = moveAngle;
+  currentPt = movePt;
+}
+
+function onTouchEnd(event) {
+	if (event.touches.length === 1) {
+  currentPt = null;
+  
+  if (stillGassing === true) {  // gas pedal was down
+  	stillGassing = false;
+    
+    setTimeout (releaseGas, 0);
+  }  
+  }
+}
+
+function onMouseUp(event) {
+  currentPt = null;
+  
+  if (stillGassing === true) {  // gas pedal was down
+  	stillGassing = false;
+    
+    setTimeout (releaseGas, 0);
+  }  
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+
+  dial.rotation.z = dialAngle;
+  updateTachometer (gasLevel); 
+}
+
+//////////////////////////////////////////////////////
+function makeTachometer () {
+	var group = new THREE.Group();
+  var base = new THREE.Mesh (new THREE.PlaneGeometry(20,2.5), new THREE.MeshBasicMaterial({color:'beige'}));
+  
+  var rpmGroup = new THREE.Group();
+  var rpm = new THREE.Mesh (new THREE.PlaneGeometry(20,2), new THREE.MeshBasicMaterial({color:'red'}));
+  rpm.position.x = 10;
+  let rpmGroup0 = new THREE.Group();
+  rpmGroup0.add (rpm);
+  rpmGroup0.position.x = -10;
+  rpmGroup = new THREE.Group();
+  rpmGroup.add (rpmGroup0);
+  group.add (rpmGroup,base);
+  return group;
+}
+
+function updateTachometer (power) {
+	tachometer.children[0].children[0].scale.x = power;
+}
+
+function clamp (v, vLo, vHi) {
+	if (v < vLo) return vLo;
+  if (v > vHi) return vHi;
+  return v;
+}
+
+function stepOnGas() {
+
+	gasLevel += 0.02;
+  gasLevel = clamp (gasLevel,0.1,1);
+  console.log (gasLevel);
+  
+	if (stillGassing)
+  	setTimeout (stepOnGas, 50);
+}
+
+function releaseGas() {
+
+	if (stillGassing === true) {  // step on gas again ...
+  	return;                     // no more releaseGas timeout
+  }
+
+	gasLevel -= 0.02;
+  gasLevel = clamp (gasLevel,0.1,1);
+  console.log (gasLevel);
+
+	if (gasLevel > 0.1)
+  	setTimeout (releaseGas, 50);
+}
+
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+</script>
+</body>
+
+</html>
