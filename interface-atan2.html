@@ -38,7 +38,7 @@ body {
 var camera, scene, renderer;
 var dialAngle = 0;
 var dial, gas, tachometer;
-var currentDialPt = null;
+var currentPt = null;
 var gasLevel = 0.1;
 var stillGassing = false;
 
@@ -46,6 +46,7 @@ init();
 animate();
 
 function init() {
+
   renderer = new THREE.WebGLRenderer({
     antialias: true
   });
@@ -55,7 +56,7 @@ function init() {
   document.body.appendChild(renderer.domElement);
 
   scene = new THREE.Scene();
-  camera = new THREE.OrthographicCamera(-30, 30, 17.5, -17.5, -10, 100);   // [60,35]
+  camera = new THREE.OrthographicCamera(-30, 30, 17.5, -17.5, -10, 100);
   camera.position.z = 10;
 
   let grid = new THREE.GridHelper(100, 20, 'white', 'white');
@@ -113,7 +114,7 @@ function onTouchStart(event) {
   
     $('#msg').text('hit mouse');
     currentPt = [mouseX, mouseY];
-    var currentAngle = Math.atan2(mouseY, mouseX - (-15));
+    currentAngle = Math.atan2(mouseY, mouseX - (-15));
 
 	} else if (infNormDst ([mouseX,mouseY], [15,0]) < 5) {  // fall into gas area
 
@@ -136,7 +137,7 @@ function infNormDst (p1, p2) {
 }
 
 function onMouseDown(event) {
-  
+
   event.preventDefault();
   let mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   let mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -149,22 +150,22 @@ function onMouseDown(event) {
   // if fall in mouse area, register currentXY
   if (infNormDst ([mouseX, mouseY], [-15,0]) < r) {
   
-    $('#msg').text('hit dial');
-    currentDialPt = [mouseX, mouseY];
+    $('#msg').text('hit dial ...');
+    currentPt = [mouseX, mouseY];
+    currentAngle = Math.atan2(mouseY, mouseX - (-15));
     console.log ('in dial: mousedown');
 
   } else if (infNormDst([mouseX,mouseY], [15,0]) < 5) {  // fall into gas area
 
+	$('#msg').text('hit gas');
 	setTimeout (stepOnGas, 0);
     stillGassing = true;
 
-	$('#msg').text('hit gas');
-	currentDialPt = null;
-
+	currentPt = null;
   } else {
     
     $('#msg').text('no hit');
-    currentDialPt = null;  
+    currentPt = null;  
   
   }
   
@@ -205,9 +206,11 @@ function onTouchMove(event) {
 
 function onMouseMove(event) {
   // if first hit not on dial, do nothing
-  if (currentDialPt === null)
+  if (currentPt === null)
     return;
-    
+
+  console.log ('in dial: mousemove');
+  
   event.preventDefault();
   let mouseX = (event.clientX / window.innerWidth) * 2 - 1;
   let mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -220,25 +223,18 @@ function onMouseMove(event) {
   // register now point [mouseX, mouseY];
   // compute turning angle
   let movePt = [mouseX, mouseY];
+  moveAngle = Math.atan2(mouseY, mouseX - (-15));
+
+	// clamping: CW/CCW 1.5 rounds
+  //console.log (moveAngle - currentAngle);
   
-  /////////////////////////////////////////
-  let dialCenter = new THREE.Vector3(-15,0,0);
-  let moveVec = new THREE.Vector3(movePt[0],movePt[1],0).sub(dialCenter);
-  let currentVec = new THREE.Vector3(currentDialPt[0],currentDialPt[1],0).sub(dialCenter);
-  
-  let ccw = (moveVec.clone().cross (currentVec)).dot(new THREE.Vector3(0,0,1)) < 0;  // (move x current).dot (0,0,1) < 0
-  let deltaAngle = moveVec.angleTo (currentVec) * (ccw ? 1 : -1);
-  
-  //  console.log (ccw);
-  dialAngle += deltaAngle;
-  dialAngle = clamp (dialAngle, -3*Math.PI, 3*Math.PI);
-  
-  //////////////////////////////////////////
-  let msg = dialAngle.toFixed(2); //`${(moveAngle-Math.PI/2).toFixed(2)}`;
+  // update dialAngle, currentAngle, currentPt;
+  dialAngle += moveAngle - currentAngle;
+  let msg = `${(moveAngle-Math.PI/2).toFixed(2)}`;
   $('#msg').text(msg);
   
-  //console.log (`moveX: ${movePt[0].toFixed(2)}; currentX: ${currentDialPt[0].toFixed(2)}; ` );
-  currentDialPt = [movePt[0], movePt[1]];
+  currentAngle = moveAngle;
+  currentPt = movePt;
 }
 
 function onTouchEnd(event) {
@@ -254,7 +250,8 @@ function onTouchEnd(event) {
 }
 
 function onMouseUp(event) {
-  currentDialPt = null;
+  currentPt = null;
+  console.log ('in mouseup');
   
   if (stillGassing === true) {  // gas pedal was down
   	stillGassing = false;
